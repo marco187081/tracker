@@ -287,12 +287,12 @@
 
 <div id="toast-container"></div>
 <!-- DEBUG PANEL -->
-<div id="debug-panel" style="position: fixed; bottom: 80px; right: 10px; background: rgba(0,0,0,0.9); color: lime; padding: 10px; border-radius: 10px; font-size: 10px; max-width: 300px; max-height: 200px; overflow-y: auto; z-index: 9999; font-family: monospace;">
-    <div style="font-weight: bold; margin-bottom: 5px;">🔍 DEBUG LOG:</div>
+<div style="position: fixed; bottom: 80px; right: 10px; background: rgba(0,0,0,0.9); color: lime; padding: 10px; border-radius: 10px; font-size: 10px; max-width: 300px; max-height: 200px; overflow-y: auto; z-index: 9999; font-family: monospace;">
+    <div style="font-weight: bold; margin-bottom: 5px;">🔍 DEBUG:</div>
     <div id="debug-log"></div>
-<!-- FIREBASE TEST BUTTON -->
-<button id="firebase-test-btn" style="position: fixed; top: 10px; right: 10px; z-index: 10000; padding: 10px; background: red; color: white; border: none; border-radius: 5px; font-weight: bold; cursor: pointer;">🔥 FIREBASE TEST</button>
 </div>
+<!-- TEST BUTTON -->
+<button onclick="testFirebase()" style="position: fixed; top: 10px; right: 10px; z-index: 10000; padding: 10px; background: red; color: white; border: none; border-radius: 5px; font-weight: bold; cursor: pointer;">🔥 TEST</button>
 
 <div id="app-content" class="hidden">
     <div class="container">
@@ -351,77 +351,86 @@
     const app = initializeApp(firebaseConfig);
     const firestore = getFirestore(app);
 
-    // STATE
-    let isAuthenticated = false;
+
     // DEBUG HELPER
     const debugLog = (msg) => {
         console.log(msg);
-        const debugPanel = document.getElementById("debug-log");
-        if (debugPanel) {
+        const el = document.getElementById('debug-log');
+        if (el) {
             const time = new Date().toLocaleTimeString();
-            debugPanel.innerHTML = `<div>[${time}] ${msg}</div>` + debugPanel.innerHTML;
-            if (debugPanel.children.length > 10) debugPanel.lastChild.remove();
+            el.innerHTML = `<div>[${time}] ${msg}</div>` + el.innerHTML;
+            if (el.children.length > 10) el.lastChild.remove();
         }
     };
 
+    // FIREBASE TEST
+    async function testFirebase() {
+        debugLog('🧪 TEST START');
+        try {
+            const testData = { products: [{id: Date.now(), name: 'TEST', price: 99}], customers: [], sales: [], payments: [], restocks: [] };
+            debugLog('📤 Schreibe...');
+            await setDoc(doc(firestore, 'businessData', 'mainStore'), testData);
+            debugLog('✅ Geschrieben!');
+            const snap = await getDoc(doc(firestore, 'businessData', 'mainStore'));
+            if (snap.exists()) {
+                debugLog('✅ Gelesen: ' + snap.data().products[0].name);
+                alert('✅ FIREBASE FUNKTIONIERT!');
+            }
+        } catch (e) {
+            debugLog('❌ FEHLER: ' + e.message);
+            alert('❌ FEHLER: ' + e.message);
+        }
+    }
+    window.testFirebase = testFirebase;
+    // STATE
+    let isAuthenticated = false;
     let allowedUsers = [];
-    let db = { products: [], customers: [], sales: [], payments: [], restocks: [] }; // Wird von Firebase geladen
+    let db = { products: [], customers: [], sales: [], payments: [], restocks: [] };
     let calDate = new Date();
     let currentTab = 'dash';
 
+    // CLOUD SYNC: Lade Daten von Firebase
     const loadFromCloud = () => {
-        debugLog("👂 LISTENING auf Firebase Änderungen...");
+        debugLog("👂 LISTENING...");
         onSnapshot(doc(firestore, "businessData", "mainStore"), (docSnap) => {
             if (docSnap.exists()) {
-                debugLog("📥 DATEN VON FIREBASE EMPFANGEN!");
-                const cloudData = docSnap.data();
-                debugLog("📦 Cloud Daten:", { products: cloudData.products?.length, customers: cloudData.customers?.length });
-                db = cloudData;
+                debugLog("📥 DATEN EMPFANGEN!");
+                db = docSnap.data();
                 if(isAuthenticated) {
-                    debugLog("🔄 RENDERING nach Cloud Update...");
+                    debugLog("🔄 RENDER...");
                     render();
                 }
             } else {
-                debugLog("⚠️ Keine Daten in Firebase gefunden");
+                debugLog("⚠️ Keine Daten in Firebase");
             }
         });
     };
-    };
 
     // CLOUD SYNC: Speichere Daten in Firebase
-    // CLOUD SYNC: Speichere Daten in Firebase
     const sync = async () => {
-        if (!isAuthenticated) {
-            debugLog("⚠️ SYNC ÜBERSPRUNGEN: Nicht authentifiziert");
-            return;
-        }
+        if (!isAuthenticated) { debugLog("⚠️ SYNC SKIP"); return; }
         try {
-            debugLog("🔄 SYNC STARTET...");
-            debugLog("📦 Daten:", { products: db.products.length, customers: db.customers.length, sales: db.sales.length });
-            
+            debugLog("🔄 SYNC START");
             await setDoc(doc(firestore, "businessData", "mainStore"), db);
-            debugLog("✅ FIREBASE SYNC ERFOLGREICH!");
-            
-            
+            debugLog("✅ FIREBASE SYNC OK!");
             lucide.createIcons();
         } catch (e) {
-            console.error("❌ SYNC FEHLER:", e);
-            alert("Firebase Sync Fehler: " + e.message);
+            debugLog("❌ SYNC ERROR: " + e.message);
+            console.error("Sync Error", e);
         }
     };
     
-    // --- AUTHENTICATION ---
-    // Benutzer direkt im Code (ändere diese für deine Login-Daten)
-    allowedUsers = [
-        { user: "admin", pass: "1234" },
-        { user: "user1", pass: "password" }
-    ];
+    // --- AUTHENTICATION MIT EXTERNER JSON ---
 
+    // Lädt die Benutzerdaten aus der externen JSON-Datei
     async function loadUserData() {
-        // Benutzer sind jetzt direkt im Code definiert
+        // Benutzer direkt im Code - ändere diese!
+        allowedUsers = [
+            { user: "admin", pass: "1234" },
+            { user: "user1", pass: "password" }
+        ];
         console.log("Benutzer geladen:", allowedUsers.length);
     }
-
     async function initAuth() {
         await loadUserData();
         lucide.createIcons();
@@ -463,8 +472,8 @@
         document.getElementById('login-overlay').classList.add('hidden');
         document.getElementById('app-content').classList.remove('hidden');
         render();
+        loadFromCloud(); // Lade Firebase Daten
         lucide.createIcons();
-        loadFromCloud(); // Lade Daten aus Firebase
     }
 
     function logout() {
@@ -486,12 +495,16 @@
 
     // --- STATE MANAGEMENT ---
 
+    const sync = () => {
+        if (!isAuthenticated) return;
+        Object.keys(db).forEach(key => localStorage.setItem(`nx_v3_${key}`, JSON.stringify(db[key])));
+        lucide.createIcons();
+    };
 
     const toast = (msg) => {
         const t = document.createElement('div');
         t.className = 'custom-toast';
         t.innerText = msg;
-        document.getElementById('toast-container').appendChild(t);
         setTimeout(() => t.remove(), 2000);
     };
 
@@ -504,6 +517,7 @@
         lucide.createIcons();
     }
 
+    let currentTab = 'dash';
     function nav(tab, el) {
         document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
         if(el) el.classList.add('active');
@@ -1190,46 +1204,10 @@
 
     function closeModal() { document.getElementById('modal').classList.add('hidden'); }
 
-    // FIREBASE TEST FUNKTION
-    async function testFirebase() {
-        debugLog("🧪 FIREBASE TEST GESTARTET...");
-        document.getElementById("firebase-test-btn").onclick = testFirebase;
-        try {
-            // Test 1: Schreibe Test-Daten
-            const testData = {
-                products: [{id: Date.now(), name: "TEST PRODUKT", price: 99.99, stock: 5}],
-                customers: [],
-                sales: [],
-                payments: [],
-                restocks: []
-            };
-            debugLog("📤 Schreibe Test-Daten...");
-            await setDoc(doc(firestore, "businessData", "mainStore"), testData);
-            debugLog("✅ Test-Daten geschrieben!");
-            
-            // Test 2: Lese Test-Daten
-            debugLog("📥 Lese Test-Daten...");
-            const docSnap = await getDoc(doc(firestore, "businessData", "mainStore"));
-            if (docSnap.exists()) {
-                debugLog("✅ Test-Daten gelesen: " + JSON.stringify(docSnap.data()).substring(0, 100));
-                alert("✅ FIREBASE FUNKTIONIERT! Daten wurden geschrieben und gelesen.");
-            } else {
-                debugLog("❌ Keine Daten gefunden");
-                alert("❌ Fehler: Keine Daten gefunden");
-            }
-        } catch (e) {
-            debugLog("❌ FIREBASE TEST FEHLER: " + e.message);
-            alert("❌ FIREBASE FEHLER: " + e.message);
-        }
-    }
-    
-    window.testFirebase = testFirebase;
-
     window.onload = () => {
         initAuth();
     };
-
-    // Mache Funktionen global verfügbar für onclick-Handler
+    // Mache Funktionen global für onclick
     window.handleLogin = handleLogin;
     window.logout = logout;
     window.toggleTheme = toggleTheme;
