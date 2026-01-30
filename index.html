@@ -286,6 +286,11 @@
 </div>
 
 <div id="toast-container"></div>
+<!-- DEBUG PANEL -->
+<div id="debug-panel" style="position: fixed; bottom: 80px; right: 10px; background: rgba(0,0,0,0.9); color: lime; padding: 10px; border-radius: 10px; font-size: 10px; max-width: 300px; max-height: 200px; overflow-y: auto; z-index: 9999; font-family: monospace;">
+    <div style="font-weight: bold; margin-bottom: 5px;">🔍 DEBUG LOG:</div>
+    <div id="debug-log"></div>
+</div>
 
 <div id="app-content" class="hidden">
     <div class="container">
@@ -346,6 +351,17 @@
 
     // STATE
     let isAuthenticated = false;
+    // DEBUG HELPER
+    const debugLog = (msg) => {
+        console.log(msg);
+        const debugPanel = document.getElementById("debug-log");
+        if (debugPanel) {
+            const time = new Date().toLocaleTimeString();
+            debugPanel.innerHTML = `<div>[${time}] ${msg}</div>` + debugPanel.innerHTML;
+            if (debugPanel.children.length > 10) debugPanel.lastChild.remove();
+        }
+    };
+
     let allowedUsers = [];
     let db = { products: JSON.parse(localStorage.getItem('nx_v3_products')) || [], customers: JSON.parse(localStorage.getItem('nx_v3_customers')) || [], sales: JSON.parse(localStorage.getItem('nx_v3_sales')) || [], payments: JSON.parse(localStorage.getItem('nx_v3_payments')) || [], restocks: JSON.parse(localStorage.getItem('nx_v3_restocks')) || [] };
     let calDate = new Date();
@@ -353,26 +369,48 @@
 
     // CLOUD SYNC: Lade Daten von Firebase
     const loadFromCloud = () => {
+    // CLOUD SYNC: Lade Daten von Firebase
+    const loadFromCloud = () => {
+        debugLog("👂 LISTENING auf Firebase Änderungen...");
         onSnapshot(doc(firestore, "businessData", "mainStore"), (docSnap) => {
             if (docSnap.exists()) {
-                db = docSnap.data();
-                // Speichere auch in localStorage wenn Daten aus Firebase kommen
+                debugLog("📥 DATEN VON FIREBASE EMPFANGEN!");
+                const cloudData = docSnap.data();
+                debugLog("📦 Cloud Daten:", { products: cloudData.products?.length, customers: cloudData.customers?.length });
+                db = cloudData;
                 Object.keys(db).forEach(key => localStorage.setItem(`nx_v3_${key}`, JSON.stringify(db[key])));
-                if(isAuthenticated) render();
+                if(isAuthenticated) {
+                    debugLog("🔄 RENDERING nach Cloud Update...");
+                    render();
+                }
+            } else {
+                debugLog("⚠️ Keine Daten in Firebase gefunden");
             }
         });
     };
+    };
 
     // CLOUD SYNC: Speichere Daten in Firebase
+    // CLOUD SYNC: Speichere Daten in Firebase
     const sync = async () => {
-        if (!isAuthenticated) return;
+        if (!isAuthenticated) {
+            debugLog("⚠️ SYNC ÜBERSPRUNGEN: Nicht authentifiziert");
+            return;
+        }
         try {
+            debugLog("🔄 SYNC STARTET...");
+            debugLog("📦 Daten:", { products: db.products.length, customers: db.customers.length, sales: db.sales.length });
+            
             await setDoc(doc(firestore, "businessData", "mainStore"), db);
-            // Speichere auch in localStorage
+            debugLog("✅ FIREBASE SYNC ERFOLGREICH!");
+            
             Object.keys(db).forEach(key => localStorage.setItem(`nx_v3_${key}`, JSON.stringify(db[key])));
+            debugLog("✅ LOCALSTORAGE SYNC ERFOLGREICH!");
+            
             lucide.createIcons();
         } catch (e) {
-            console.error("Sync Error", e);
+            console.error("❌ SYNC FEHLER:", e);
+            alert("Firebase Sync Fehler: " + e.message);
         }
     };
     
