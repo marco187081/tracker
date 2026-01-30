@@ -356,6 +356,8 @@
         onSnapshot(doc(firestore, "businessData", "mainStore"), (docSnap) => {
             if (docSnap.exists()) {
                 db = docSnap.data();
+                // Speichere auch in localStorage wenn Daten aus Firebase kommen
+                Object.keys(db).forEach(key => localStorage.setItem(`nx_v3_${key}`, JSON.stringify(db[key])));
                 if(isAuthenticated) render();
             }
         });
@@ -374,19 +376,16 @@
         }
     };
     
-    // --- AUTHENTICATION MIT EXTERNER JSON ---
+    // --- AUTHENTICATION ---
+    // Benutzer direkt im Code (ändere diese für deine Login-Daten)
+    allowedUsers = [
+        { user: "admin", pass: "1234" },
+        { user: "user1", pass: "password" }
+    ];
 
-    // Lädt die Benutzerdaten aus der externen JSON-Datei
     async function loadUserData() {
-        try {
-            const response = await fetch('users.json');
-            if (!response.ok) throw new Error("JSON nicht gefunden");
-            const data = await response.json();
-            allowedUsers = data.users;
-        } catch (error) {
-            console.error("Login-Daten-Fehler:", error);
-            toast("Fehler: users.json konnte nicht geladen werden!");
-        }
+        // Benutzer sind jetzt direkt im Code definiert
+        console.log("Benutzer geladen:", allowedUsers.length);
     }
 
     async function initAuth() {
@@ -431,6 +430,7 @@
         document.getElementById('app-content').classList.remove('hidden');
         render();
         lucide.createIcons();
+        loadFromCloud(); // Lade Daten aus Firebase
     }
 
     function logout() {
