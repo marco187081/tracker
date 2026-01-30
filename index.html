@@ -495,7 +495,7 @@
 
     // --- STATE MANAGEMENT ---
 
-    const sync = () => {
+    const sync = () =>{
         if (!isAuthenticated) return;
         Object.keys(db).forEach(key => localStorage.setItem(`nx_v3_${key}`, JSON.stringify(db[key])));
         lucide.createIcons();
@@ -1232,3 +1232,4 @@
 </script>
 </body>
 </html>
+
