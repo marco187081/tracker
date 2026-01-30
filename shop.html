@@ -1,0 +1,1187 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Business-Tracker</title>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;600;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <style>
+        :root {
+            --primary: #6366f1;
+            --primary-glow: rgba(99, 102, 241, 0.4);
+            --bg: #0f172a;
+            --card: rgba(30, 41, 59, 0.6);
+            --border: rgba(255, 255, 255, 0.08);
+            --text: #f8fafc;
+            --text-dim: #94a3b8;
+            --success: #22c55e;
+            --warning: #f59e0b;
+            --danger: #ef4444;
+            --input-bg: rgba(15, 23, 42, 0.9);
+        }
+
+        [data-theme="light"] {
+            --bg: #f1f5f9;
+            --card: rgba(255, 255, 255, 0.8);
+            --border: rgba(0, 0, 0, 0.1);
+            --text: #0f172a;
+            --text-dim: #64748b;
+            --input-bg: #ffffff;
+        }
+
+        * { 
+            box-sizing: border-box; 
+            -webkit-tap-highlight-color: transparent; 
+            font-family: 'Plus Jakarta Sans', sans-serif; 
+        }
+
+        body { 
+            margin: 0; 
+            background: var(--bg); 
+            color: var(--text); 
+            min-height: 100vh; 
+            padding-bottom: 120px; 
+            transition: background 0.3s ease, color 0.3s ease;
+            overflow-x: hidden;
+        }
+
+        .container { max-width: 500px; margin: 0 auto; padding: 20px; }
+        
+        @keyframes fadeInScale {
+            from { opacity: 0; transform: scale(0.95) translateY(10px); }
+            to { opacity: 1; transform: scale(1) translateY(0); }
+        }
+
+        .animate-item {
+            animation: fadeInScale 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275) both;
+        }
+
+        header { 
+            display: flex; 
+            justify-content: space-between; 
+            align-items: center; 
+            margin-bottom: 25px; 
+        }
+
+        .search-bar { 
+            background: var(--card); 
+            border: 1px solid var(--border); 
+            border-radius: 16px; 
+            padding: 12px 16px; 
+            display: flex; 
+            align-items: center; 
+            gap: 10px; 
+            margin-bottom: 20px; 
+            backdrop-filter: blur(12px);
+        }
+        .search-bar input { background: transparent; border: none; color: inherit; width: 100%; outline: none; }
+
+        .stats-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 25px; }
+        .mini-card { 
+            background: var(--card); 
+            padding: 15px; 
+            border-radius: 20px; 
+            border: 1px solid var(--border);
+        }
+        .mini-card.main-stat {
+            grid-column: span 2;
+            background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%);
+            color: white;
+            border: none;
+        }
+
+        .chart-container {
+            background: var(--card);
+            border-radius: 24px;
+            padding: 15px;
+            border: 1px solid var(--border);
+            margin-bottom: 25px;
+        }
+
+        .glass-card { 
+            background: var(--card); 
+            backdrop-filter: blur(20px); 
+            border: 1px solid var(--border); 
+            border-radius: 22px; 
+            padding: 20px; 
+            margin-bottom: 15px;
+        }
+
+        .badge { padding: 4px 8px; border-radius: 8px; font-size: 10px; font-weight: 800; }
+        .badge-low { background: rgba(239, 68, 68, 0.15); color: var(--danger); border: 1px solid rgba(239, 68, 68, 0.3); }
+        .badge-ok { background: rgba(34, 197, 94, 0.15); color: var(--success); }
+
+        .btn-action { 
+            background: var(--primary); 
+            color: white; 
+            border: none; 
+            border-radius: 14px; 
+            padding: 12px; 
+            font-weight: 700; 
+            width: 100%; 
+            cursor: pointer; 
+            display: flex; 
+            align-items: center; 
+            justify-content: center; 
+            gap: 8px;
+            transition: transform 0.1s;
+        }
+        .btn-action:active { transform: scale(0.98); }
+
+        .btn-outline { 
+            background: rgba(255,255,255,0.05); 
+            border: 1px solid var(--border); 
+            color: inherit; 
+            border-radius: 12px; 
+            padding: 8px 12px; 
+            font-size: 12px;
+            cursor: pointer;
+        }
+
+        nav { 
+            position: fixed; 
+            bottom: 20px; 
+            left: 20px; 
+            right: 20px; 
+            background: var(--card); 
+            backdrop-filter: blur(25px); 
+            border: 1px solid var(--border); 
+            border-radius: 24px; 
+            display: flex; 
+            justify-content: space-around; 
+            padding: 12px; 
+            z-index: 1000;
+        }
+        .nav-btn { background: transparent; border: none; color: var(--text-dim); display: flex; flex-direction: column; align-items: center; gap: 4px; font-size: 10px; font-weight: 700; cursor: pointer; flex: 1; }
+        .nav-btn.active { color: var(--primary); }
+
+        .overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.7);
+            backdrop-filter: blur(8px);
+            z-index: 2000;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+        .hidden { display: none !important; }
+
+        input, select, textarea {
+            width: 100%; 
+            background: var(--input-bg); 
+            border: 1px solid var(--border); 
+            border-radius: 12px; 
+            padding: 14px; 
+            color: var(--text); 
+            margin-top: 6px;
+            outline: none;
+            font-size: 16px;
+        }
+
+        /* Calendar Styling */
+        .calendar-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 8px; margin-top: 15px; }
+        .calendar-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+        .calendar-day-name { text-align: center; font-size: 10px; color: var(--text-dim); font-weight: 800; padding-bottom: 5px; }
+        .calendar-cell { 
+            aspect-ratio: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; 
+            background: var(--card); border-radius: 12px; border: 1px solid var(--border); font-size: 14px; font-weight: 600; cursor: pointer; position: relative;
+        }
+        .calendar-cell.empty { background: transparent; border: none; cursor: default; }
+        .calendar-cell.today { border: 2px solid var(--primary); }
+        .calendar-cell.has-payment::after { 
+            content: ''; position: absolute; bottom: 6px; width: 4px; height: 4px; background: var(--success); border-radius: 50%; 
+        }
+
+
+        
+
+        #bg-video {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            min-width: 100%;
+            min-height: 100%;
+            width: auto;
+            height: auto;
+            z-index: -1;
+            transform: translate(-50%, -50%) scale(1.1); /* Zentriert das Video und vergrößert es leicht für den Blur */
+            object-fit: cover;
+            filter: blur(10px) brightness(0.5);
+        }       
+
+        /* Login Screen Anpassung */
+        .login-screen {
+        position: fixed;
+        inset: 0;
+        background: transparent !important; /* WICHTIG: Überschreibt den dunklen Standard-Hintergrund */
+        z-index: 9999;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 20px;
+        }
+
+        .login-card {
+        width: 100%;
+        max-width: 350px;
+        text-align: center;
+        /* Glaseffekt für die Karte selbst */
+        background: rgba(30, 41, 59, 0.7) !important; 
+        backdrop-filter: blur(10px);
+        border: 1px solid var(--border);
+        padding: 30px;
+        border-radius: 28px;
+        }
+
+        .custom-toast {
+            position: fixed; top: 20px; left: 50%; transform: translateX(-50%);
+            background: var(--primary); color: white; padding: 10px 20px; border-radius: 12px;
+            z-index: 3000; font-weight: 700; animation: slideDown 0.3s ease;
+        }
+        @keyframes slideDown { from { top: -50px; } to { top: 20px; } }
+
+        .log-entry {
+            font-size: 11px;
+            padding: 8px 0;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+        }
+        .log-time { color: var(--text-dim); font-weight: 600; }
+        .log-msg { color: var(--text); }
+
+        /* Multi-column Layout for Customer Info */
+        .grid-half { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+        .customer-pic { width: 80px; height: 80px; border-radius: 50%; object-fit: cover; border: 2px solid var(--primary); }
+        .social-row { display: flex; align-items: center; gap: 8px; margin-bottom: 5px; font-size: 13px; }
+    </style>
+</head>
+<body data-theme="dark">
+
+<!-- Login Screen -->
+<body data-theme="dark">
+<div id="login-overlay" class="login-screen">
+    <video autoplay muted loop playsinline id="bg-video">
+        <source src="video.mp4" type="video/mp4">
+    </video>
+
+    <div class="login-card animate-item">
+        <div style="background: var(--primary); width: 60px; height: 60px; border-radius: 20px; display: flex; align-items: center; justify-content: center; margin: 0 auto 20px;">
+            <i data-lucide="shield-check" style="color: white; width: 32px; height: 32px;"></i>
+        </div>
+        <h2 id="login-title" style="margin: 0 0 10px;">Business-Tracker</h2>
+        <p id="login-desc" style="color: var(--text-dim); font-size: 14px; margin-bottom: 25px;">Sicherheitsprüfung erforderlich</p>
+        
+        <input type="text" id="user-input" placeholder="Benutzername" style="text-align: center; margin-bottom: 10px;">
+        <input type="password" id="pass-input" placeholder="Passwort eingeben" style="text-align: center; letter-spacing: 4px;">
+        <button class="btn-action" style="margin-top: 20px;" onclick="handleLogin()">Eintreten</button>
+    </div>
+</div>
+
+<div id="toast-container"></div>
+
+<div id="app-content" class="hidden">
+    <div class="container">
+        <header>
+            <div>
+                <h1 style="margin:0; font-size: 24px; font-weight: 800;">Business-Tracker</h1>
+                <p style="color: var(--text-dim); margin:0; font-size: 12px;">v1.5 - Detailliertes Kundenmodul</p>
+            </div>
+            <div style="display:flex; gap:8px">
+                <button class="btn-outline" onclick="toggleTheme()"><i data-lucide="sun" id="theme-icon" size="16"></i></button>
+                <button class="btn-outline" onclick="showBackupMenu()"><i data-lucide="settings" size="16"></i></button>
+            </div>
+        </header>
+
+        <div class="search-bar animate-item" id="search-container">
+            <i data-lucide="search" size="16" style="color: var(--text-dim)"></i>
+            <input type="text" id="globalSearch" placeholder="Suchen..." oninput="handleSearch()">
+        </div>
+
+        <div id="main-content"></div>
+    </div>
+
+    <nav>
+        <button class="nav-btn active" onclick="nav('dash', this)"><i data-lucide="layout-dashboard"></i>Dash</button>
+        <button class="nav-btn" onclick="nav('inv', this)"><i data-lucide="package"></i>Lager</button>
+        <button class="nav-btn" onclick="nav('cust', this)"><i data-lucide="users"></i>Kunden</button>
+        <button class="nav-btn" onclick="nav('cal', this)"><i data-lucide="calendar"></i>Kalender</button>
+        <button class="nav-btn" onclick="nav('card', this)"><i data-lucide="map"></i>Karte</button>
+        <button class="nav-btn" onclick="nav('debt', this)"><i data-lucide="wallet"></i>Kasse</button>
+    </nav>
+</div>
+
+<div id="modal" class="overlay hidden" onclick="if(event.target==this) closeModal()">
+    <div class="glass-card animate-item" style="width: 100%; max-width: 400px; max-height: 85vh; overflow-y: auto;">
+        <div id="modal-content"></div>
+    </div>
+</div>
+
+
+
+<script type="module">
+    // FIREBASE SDK IMPORT
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+    import { getFirestore, doc, setDoc, getDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+
+    const firebaseConfig = {
+        apiKey: "AIzaSyC08zdyNqMjheeN8IGjqDo6xQmh5HiJZvg",
+        authDomain: "tracker-aecec.firebaseapp.com",
+        projectId: "tracker-aecec",
+        storageBucket: "tracker-aecec.firebasestorage.app",
+        messagingSenderId: "126430495526",
+        appId: "1:126430495526:web:74b5213ba3fa08376837e7",
+        measurementId: "G-9QFH8JJXYH"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const firestore = getFirestore(app);
+
+    // STATE
+    let isAuthenticated = false;
+    let allowedUsers = [];
+    let db = { products: JSON.parse(localStorage.getItem('nx_v3_products')) || [], customers: JSON.parse(localStorage.getItem('nx_v3_customers')) || [], sales: JSON.parse(localStorage.getItem('nx_v3_sales')) || [], payments: JSON.parse(localStorage.getItem('nx_v3_payments')) || [], restocks: JSON.parse(localStorage.getItem('nx_v3_restocks')) || [] };
+    let calDate = new Date();
+    let currentTab = 'dash';
+
+    // CLOUD SYNC: Lade Daten von Firebase
+    const loadFromCloud = () => {
+        onSnapshot(doc(firestore, "businessData", "mainStore"), (docSnap) => {
+            if (docSnap.exists()) {
+                db = docSnap.data();
+                if(isAuthenticated) render();
+            }
+        });
+    };
+
+    // CLOUD SYNC: Speichere Daten in Firebase
+    const sync = async () => {
+        if (!isAuthenticated) return;
+        try {
+            await setDoc(doc(firestore, "businessData", "mainStore"), db);
+            // Speichere auch in localStorage
+            Object.keys(db).forEach(key => localStorage.setItem(`nx_v3_${key}`, JSON.stringify(db[key])));
+            lucide.createIcons();
+        } catch (e) {
+            console.error("Sync Error", e);
+        }
+    };
+    
+    // --- AUTHENTICATION MIT EXTERNER JSON ---
+
+    // Lädt die Benutzerdaten aus der externen JSON-Datei
+    async function loadUserData() {
+        try {
+            const response = await fetch('users.json');
+            if (!response.ok) throw new Error("JSON nicht gefunden");
+            const data = await response.json();
+            allowedUsers = data.users;
+        } catch (error) {
+            console.error("Login-Daten-Fehler:", error);
+            toast("Fehler: users.json konnte nicht geladen werden!");
+        }
+    }
+
+    async function initAuth() {
+        await loadUserData();
+        lucide.createIcons();
+        
+        // Login-UI Anpassung
+        const passInput = document.getElementById('pass-input');
+        if (!document.getElementById('user-input')) {
+            const userInput = document.createElement('input');
+            userInput.type = "text";
+            userInput.id = "user-input";
+            userInput.placeholder = "Benutzername";
+            userInput.style.textAlign = "center";
+            userInput.style.marginBottom = "10px";
+            passInput.parentNode.insertBefore(userInput, passInput);
+        }
+    }
+
+    async function handleLogin() {
+        const userVal = document.getElementById('user-input').value;
+        const passVal = document.getElementById('pass-input').value;
+
+        if (!userVal || !passVal) return toast("Bitte alles ausfüllen");
+
+        // Überprüfung gegen die geladene JSON
+        const validUser = allowedUsers.find(u => u.user === userVal && u.pass === passVal);
+
+        if (validUser) {
+            addLog(`Erfolgreicher Login: ${userVal}`);
+            unlockApp();
+        } else {
+            addLog(`Fehlgeschlagener Login: ${userVal}`);
+            toast("Zugangsdaten falsch!");
+            document.getElementById('pass-input').value = "";
+        }
+    }
+
+    function unlockApp() {
+        isAuthenticated = true;
+        document.getElementById('login-overlay').classList.add('hidden');
+        document.getElementById('app-content').classList.remove('hidden');
+        render();
+        lucide.createIcons();
+    }
+
+    function logout() {
+        addLog("Abmeldung (App Sperre).");
+        isAuthenticated = false;
+        location.reload();
+    }
+
+    // --- LOG SYSTEM ---
+    function addLog(message) {
+        const logs = JSON.parse(localStorage.getItem('nx_v3_logs')) || [];
+        logs.unshift({
+            time: new Date().toISOString(),
+            msg: message
+        });
+        if (logs.length > 100) logs.pop();
+        localStorage.setItem('nx_v3_logs', JSON.stringify(logs));
+    }
+
+    // --- STATE MANAGEMENT ---
+
+
+    const toast = (msg) => {
+        const t = document.createElement('div');
+        t.className = 'custom-toast';
+        t.innerText = msg;
+        document.getElementById('toast-container').appendChild(t);
+        setTimeout(() => t.remove(), 2000);
+    };
+
+    function toggleTheme() {
+        const body = document.body;
+        const icon = document.getElementById('theme-icon');
+        const isDark = body.getAttribute('data-theme') === 'dark';
+        body.setAttribute('data-theme', isDark ? 'light' : 'dark');
+        icon.setAttribute('data-lucide', isDark ? 'moon' : 'sun');
+        lucide.createIcons();
+    }
+
+    function nav(tab, el) {
+        document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+        if(el) el.classList.add('active');
+        currentTab = tab;
+        render();
+    }
+
+    function render() {
+        if (!isAuthenticated) return;
+        const container = document.getElementById('main-content');
+        document.getElementById('search-container').classList.toggle('hidden', ['dash', 'cal'].includes(currentTab));
+        
+        if (currentTab === 'dash') renderDash(container);
+        if (currentTab === 'inv') renderInv(container);
+        if (currentTab === 'cust') renderCust(container);
+        if (currentTab === 'cal') renderCalendar(container);
+        if (currentTab === 'card') renderMap(container);
+        if (currentTab === 'debt') renderDebt(container);
+        
+        sync();
+    }
+
+    // --- DASHBOARD ---
+    function renderDash(container) {
+        const last7Days = Array.from({length: 7}, (_, i) => {
+            const d = new Date();
+            d.setHours(0,0,0,0);
+            d.setDate(d.getDate() - i);
+            return d.getTime();
+        }).reverse();
+
+        const dailyRevenue = last7Days.map(day => {
+            return db.sales.filter(s => {
+                const sd = new Date(s.date);
+                sd.setHours(0,0,0,0);
+                return sd.getTime() === day;
+            }).reduce((sum, s) => {
+                const p = db.products.find(x => x.id === s.pid);
+                return sum + (s.qty * (p?.price || 0));
+            }, 0);
+        });
+
+        const totalRevenue = db.sales.reduce((sum, s) => {
+            const p = db.products.find(x => x.id === s.pid);
+            return sum + (s.qty * (p?.price || 0));
+        }, 0);
+
+        const totalProfit = db.sales.reduce((sum, s) => {
+            const p = db.products.find(x => x.id === s.pid);
+            if(!p) return sum;
+            return sum + (s.qty * (p.price - (p.cost || 0)));
+        }, 0);
+
+        const counts = {};
+        db.sales.forEach(s => counts[s.pid] = (counts[s.pid] || 0) + s.qty);
+        const bestsellers = Object.entries(counts)
+            .map(([id, qty]) => ({ prod: db.products.find(p => p.id == id), qty }))
+            .filter(x => x.prod)
+            .sort((a,b) => b.qty - a.qty).slice(0, 3);
+
+        const lowStock = db.products.filter(p => p.stock < 10);
+
+        container.innerHTML = `
+            <div class="stats-grid animate-item">
+                <div class="mini-card main-stat">
+                    <label style="opacity:0.8; font-size:11px; font-weight:700">GESAMTUMSATZ</label>
+                    <div style="font-size:32px; font-weight:800">${totalRevenue.toFixed(2)} €</div>
+                    <div style="font-size:12px; opacity:0.9; margin-top:4px">Geschätzter Reingewinn: ${totalProfit.toFixed(2)} €</div>
+                </div>
+            </div>
+
+            <div class="chart-container animate-item">
+                <canvas id="revenueChart" height="150"></canvas>
+            </div>
+
+            ${lowStock.length > 0 ? `
+                <div class="glass-card animate-item" style="border-color: var(--danger); background: rgba(239, 68, 68, 0.05)">
+                    <h3 style="margin:0; font-size:14px; color:var(--danger); display:flex; align-items:center; gap:8px">
+                        <i data-lucide="alert-triangle" size="16"></i> Niedriger Bestand
+                    </h3>
+                    <div style="margin-top:10px; display:flex; gap:8px; overflow-x:auto; padding-bottom:5px">
+                        ${lowStock.map(p => `<span class="badge badge-low">${p.name}: ${p.stock}</span>`).join('')}
+                    </div>
+                </div>
+            ` : ''}
+
+            <h3 class="animate-item" style="font-size:14px; margin-bottom:12px">Top Bestseller</h3>
+            <div class="list-container animate-item">
+                ${bestsellers.map(b => `
+                    <div class="glass-card" style="padding:12px; display:flex; justify-content:space-between; align-items:center; margin-bottom:8px">
+                        <span style="font-weight:700">${b.prod.name}</span>
+                        <span class="badge badge-ok">${b.qty} Verkäufe</span>
+                    </div>
+                `).join('') || '<p style="color:var(--text-dim); text-align:center">Noch keine Verkäufe.</p>'}
+            </div>
+        `;
+
+        new Chart(document.getElementById('revenueChart'), {
+            type: 'line',
+            data: {
+                labels: last7Days.map(d => new Date(d).toLocaleDateString('de-DE', {weekday: 'short'})),
+                datasets: [{
+                    label: 'Umsatz (€)',
+                    data: dailyRevenue,
+                    borderColor: '#6366f1',
+                    backgroundColor: 'rgba(99, 102, 241, 0.1)',
+                    fill: true,
+                    tension: 0.4,
+                    pointRadius: 4,
+                    pointBackgroundColor: '#6366f1'
+                }]
+            },
+            options: {
+                plugins: { legend: { display: false } },
+                scales: { 
+                    y: { display: false },
+                    x: { grid: { display: false }, ticks: { color: '#94a3b8' } }
+                }
+            }
+        });
+    }
+
+    // --- CALENDAR LOGIC ---
+    function renderCalendar(container) {
+        const month = calDate.getMonth();
+        const year = calDate.getFullYear();
+        const monthName = new Intl.DateTimeFormat('de-DE', { month: 'long', year: 'numeric' }).format(calDate);
+
+        const firstDay = new Date(year, month, 1).getDay();
+        const daysInMonth = new Date(year, month + 1, 0).getDate();
+        const startingPoint = firstDay === 0 ? 6 : firstDay - 1; 
+
+        let html = `
+            <div class="calendar-header animate-item">
+                <h3 style="margin:0">${monthName}</h3>
+                <div style="display:flex; gap:10px">
+                    <button class="btn-outline" onclick="changeMonth(-1)"><i data-lucide="chevron-left" size="14"></i></button>
+                    <button class="btn-outline" onclick="changeMonth(1)"><i data-lucide="chevron-right" size="14"></i></button>
+                </div>
+            </div>
+            <div class="calendar-grid animate-item">
+                ${['Mo','Di','Mi','Do','Fr','Sa','So'].map(d => `<div class="calendar-day-name">${d}</div>`).join('')}
+                ${Array(startingPoint).fill('<div class="calendar-cell empty"></div>').join('')}
+        `;
+
+        for (let i = 1; i <= daysInMonth; i++) {
+            const dateStr = `${year}-${String(month+1).padStart(2,'0')}-${String(i).padStart(2,'0')}`;
+            const hasPayment = db.payments.some(p => new Date(p.date).toISOString().split('T')[0] === dateStr);
+            const isToday = new Date().toISOString().split('T')[0] === dateStr;
+            
+            html += `
+                <div class="calendar-cell ${hasPayment ? 'has-payment' : ''} ${isToday ? 'today' : ''}" 
+                     onclick="showDayDetails('${dateStr}')">
+                    ${i}
+                </div>
+            `;
+        }
+
+        html += `</div>`;
+        container.innerHTML = html;
+        lucide.createIcons();
+    }
+
+    function changeMonth(dir) {
+        calDate.setMonth(calDate.getMonth() + dir);
+        renderCalendar(document.getElementById('main-content'));
+    }
+
+    function showDayDetails(dateStr) {
+        const dayPayments = db.payments.filter(p => new Date(p.date).toISOString().split('T')[0] === dateStr);
+        const daySales = db.sales.filter(s => new Date(s.date).toISOString().split('T')[0] === dateStr);
+        
+        let content = `<h3>Details: ${new Date(dateStr).toLocaleDateString('de-DE')}</h3>`;
+        
+        content += `<h4 style="margin-bottom:10px; color:var(--success)">Zahlungseingänge</h4>`;
+        if (dayPayments.length === 0) content += `<p style="color:var(--text-dim); font-size:12px">Keine Zahlungen an diesem Tag.</p>`;
+        else {
+            dayPayments.forEach(p => {
+                const c = db.customers.find(x => x.id === p.cid);
+                content += `
+                    <div style="display:flex; justify-content:space-between; margin-bottom:10px; background:rgba(34,197,94,0.1); padding:12px; border-radius:12px">
+                        <div>
+                            <b>${c ? c.name : 'Gelöschter Kunde'}</b><br>
+                            <small>${new Date(p.date).toLocaleTimeString('de-DE', {hour:'2-digit', minute:'2-digit'})} Uhr</small>
+                        </div>
+                        <div style="color:var(--success); font-weight:800; font-size:16px">+ ${p.amount.toFixed(2)}€</div>
+                    </div>
+                `;
+            });
+        }
+
+        content += `<h4 style="margin-top:25px; margin-bottom:10px">Verkäufe</h4>`;
+        if (daySales.length === 0) content += `<p style="color:var(--text-dim); font-size:12px">Keine Verkäufe an diesem Tag.</p>`;
+        else {
+            daySales.forEach(s => {
+                const p = db.products.find(x => x.id === s.pid);
+                const c = db.customers.find(x => x.id === s.cid);
+                content += `
+                    <div style="font-size:13px; margin-bottom:8px; border-bottom:1px solid var(--border); padding-bottom:5px">
+                        ${s.qty}x ${p ? p.name : 'Gelöscht'} an <b>${c ? c.name : 'Unbekannt'}</b>
+                    </div>
+                `;
+            });
+        }
+
+        document.getElementById('modal-content').innerHTML = content;
+        document.getElementById('modal').classList.remove('hidden');
+    }
+
+    // --- INVENTORY ---
+    function renderInv(container) {
+        container.innerHTML = `
+            <div class="glass-card animate-item">
+                <h3 style="margin-top:0; font-size:16px">Produkt hinzufügen</h3>
+                <input type="text" id="pn" placeholder="Name">
+                <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px">
+                    <div><label style="font-size:10px; color:var(--text-dim)">VERKAUFSPREIS</label><input type="number" id="pp" placeholder="0.00 €" step="0.1"></div>
+                    <div><label style="font-size:10px; color:var(--text-dim)">EINKAUFSPREIS</label><input type="number" id="pc" placeholder="0.00 €" step="0.1"></div>
+                </div>
+                <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px">
+                    <div><label style="font-size:10px; color:var(--text-dim)">BESTAND</label><input type="number" id="ps" placeholder="Menge"></div>
+                    <div><label style="font-size:10px; color:var(--text-dim)">EINHEIT</label>
+                        <select id="pw">
+                            <option value="1g">1g</option><option value="5g">5g</option>
+                            <option value="10g">10g</option><option value="50g">50g</option>
+                            <option value="100g">100g</option><option value="Stk">Stk</option>
+                        </select>
+                    </div>
+                </div>
+                <button class="btn-action" style="margin-top:15px" onclick="addP()">Produkt speichern</button>
+            </div>
+            <div id="inv-list"></div>
+        `;
+        renderInvList();
+    }
+
+    function renderInvList() {
+        const list = document.getElementById('inv-list');
+        list.innerHTML = db.products.map(p => `
+            <div class="glass-card animate-item list-item" style="display:flex; justify-content:space-between; align-items:center">
+                <div onclick="openRestockModal(${p.id})">
+                    <div style="font-weight:700">${p.name} <small style="color:var(--primary)">(${p.weight})</small></div>
+                    <div style="font-size:12px; color:var(--text-dim)">Marge: ${(p.price - p.cost).toFixed(2)}€ pro Einheit</div>
+                </div>
+                <div style="text-align:right">
+                    <span class="badge ${p.stock < 10 ? 'badge-low' : 'badge-ok'}">${p.stock} Verfügbar</span>
+                    <div style="margin-top:8px">
+                        <i data-lucide="trash-2" size="14" style="color:var(--danger)" onclick="del('products', ${p.id})"></i>
+                    </div>
+                </div>
+            </div>
+        `).join('');
+        lucide.createIcons();
+    }
+
+    function openRestockModal(pid) {
+        const p = db.products.find(x => x.id === pid);
+        const content = document.getElementById('modal-content');
+        content.innerHTML = `
+            <h3>Lager auffüllen: ${p.name}</h3>
+            <input type="number" id="restockQty" value="10" placeholder="Menge">
+            <input type="number" id="restockCost" value="${(p.cost * 10).toFixed(2)}" placeholder="Gesamtkosten">
+            <button class="btn-action" style="margin-top:20px" onclick="confirmRestock(${pid})">Aktualisieren</button>
+        `;
+        document.getElementById('modal').classList.remove('hidden');
+    }
+
+    function confirmRestock(pid) {
+        const qty = parseInt(document.getElementById('restockQty').value);
+        const cost = parseFloat(document.getElementById('restockCost').value);
+        const p = db.products.find(x => x.id === pid);
+        if(p && !isNaN(qty)) {
+            p.stock += qty;
+            db.restocks.push({ pid, qty, cost, date: Date.now() });
+            addLog(`Lager aufgefüllt: ${p.name} (+${qty}).`);
+            closeModal(); render();
+        }
+    }
+
+    // --- CUSTOMERS ---
+    function renderCust(container) {
+    container.innerHTML = `
+        <div class="glass-card animate-item">
+            <h3 style="margin-top:0; font-size:16px">Neuer Kunde</h3>
+            <input type="text" id="cpic" placeholder="Profilbild URL (optional)">
+            <div class="grid-half">
+                <input type="text" id="cfn" placeholder="Vorname">
+                <input type="text" id="cln" placeholder="Nachname">
+            </div>
+            <input type="text" id="cadr" placeholder="Straße, Hausnummer, Stadt (für Karte)">
+            <div class="grid-half">
+                <input type="number" id="cage" placeholder="Alter">
+                <select id="cgen">
+                    <option value="">Geschlecht wählen</option>
+                    <option value="Männlich">Männlich</option>
+                    <option value="Weiblich">Weiblich</option>
+                    <option value="Divers">Divers</option>
+                </select>
+            </div>
+            <div class="grid-half">
+                <input type="text" id="cinsta" placeholder="Instagram">
+                <input type="text" id="csnap" placeholder="Snapchat">
+            </div>
+            <div class="grid-half">
+                <input type="text" id="ctele" placeholder="Telegram">
+                <input type="text" id="cphone" placeholder="Telefonnummer">
+            </div>
+            <button class="btn-action" style="margin-top:15px" onclick="addC()">Erstellen</button>
+        </div>
+        <div id="cust-list"></div>
+    `;
+    renderCustList();
+    }
+
+    function renderCustList() {
+        const list = document.getElementById('cust-list');
+        list.innerHTML = db.customers.map(c => `
+            <div class="glass-card animate-item list-item" onclick="openCustProfile(${c.id})">
+                <div style="display:flex; justify-content:space-between; align-items:center">
+                    <div style="display:flex; gap:12px; align-items:center">
+                        <img src="${c.pic || 'https://via.placeholder.com/80?text=User'}" style="width:40px; height:40px; border-radius:50%; object-fit:cover">
+                        <div>
+                            <div style="font-weight:700">${c.name}</div>
+                            <div style="font-size:11px; color:var(--text-dim)">${c.phone || 'Keine Nummer'}</div>
+                        </div>
+                    </div>
+                    <div style="text-align:right">
+                         <div style="font-size:12px; font-weight:800; color:${getCustomerDebt(c.id) > 0 ? 'var(--danger)' : 'var(--success)'}">${getCustomerDebt(c.id).toFixed(2)}€</div>
+                    </div>
+                </div>
+            </div>
+        `).join('');
+        lucide.createIcons();
+    }
+
+    function getCustomerDebt(cid) {
+        const totalSales = db.sales.filter(s => s.cid === cid).reduce((sum, s) => {
+            const p = db.products.find(x => x.id === s.pid);
+            return sum + (s.qty * (p?.price || 0));
+        }, 0);
+        const totalPaid = db.payments.filter(p => p.cid === cid).reduce((sum, p) => sum + p.amount, 0);
+        return Math.max(0, totalSales - totalPaid);
+    }
+
+    function openCustProfile(cid) {
+        const c = db.customers.find(x => x.id === cid);
+        const history = db.sales.filter(s => s.cid === cid).reverse();
+        const debt = getCustomerDebt(cid);
+        const content = document.getElementById('modal-content');
+        
+        content.innerHTML = `
+            <div style="display:flex; gap:15px; margin-bottom:20px; align-items:center">
+                <img src="${c.pic || 'https://via.placeholder.com/80?text=User'}" class="customer-pic">
+                <div>
+                    <h3 style="margin:0">${c.name}</h3>
+                    <div style="color:var(--text-dim); font-size:13px">${c.age ? c.age + ' Jahre' : ''} ${c.gender || ''}</div>
+                </div>
+            </div>
+
+            <div style="color:${debt > 0 ? 'var(--danger)' : 'var(--success)'}; font-weight:800; font-size:24px; margin-bottom:20px">${debt.toFixed(2)} € Schulden</div>
+
+            <div style="background:rgba(255,255,255,0.03); padding:15px; border-radius:15px; margin-bottom:15px">
+                <div class="social-row"><i data-lucide="instagram" size="14"></i> ${c.instagram || '---'}</div>
+                <div class="social-row"><i data-lucide="ghost" size="14"></i> ${c.snapchat || '---'}</div>
+                <div class="social-row"><i data-lucide="send" size="14"></i> ${c.telegram || '---'}</div>
+                <div class="social-row"><i data-lucide="phone" size="14"></i> ${c.phone || '---'}</div>
+            </div>
+
+            <label style="font-size:11px; font-weight:700; color:var(--text-dim)">NOTIZEN</label>
+            <textarea id="cnote" onchange="updateCustNote(${cid}, this.value)" style="margin-bottom:15px">${c.note || ''}</textarea>
+
+            <div style="display:flex; gap:10px">
+                <button class="btn-action" onclick="openSale(${cid})">Kauf</button>
+                <button class="btn-outline" onclick="openPayModal(${cid}, ${debt})">Zahlung</button>
+                <button class="btn-outline" style="color:var(--danger)" onclick="del('customers', ${cid}); closeModal();"><i data-lucide="trash-2" size="14"></i></button>
+            </div>
+
+            <h4 style="margin:25px 0 10px">Verlauf</h4>
+            <div style="max-height: 150px; overflow-y: auto;">
+                ${history.map(s => {
+                    const p = db.products.find(x=>x.id==s.pid);
+                    return `<div style="font-size:12px; padding:6px 0; border-bottom:1px solid var(--border)">
+                        ${new Date(s.date).toLocaleDateString()} - ${s.qty}x ${p?.name || 'Gelöscht'}
+                    </div>`
+                }).join('') || '<small style="color:var(--text-dim)">Keine Historie</small>'}
+            </div>
+        `;
+        document.getElementById('modal').classList.remove('hidden');
+        lucide.createIcons();
+    }
+
+    function renderMap(container) {
+    // 1. Sicherstellen, dass der Container selbst Platz hat
+    container.style.overflowX = "visible";
+    
+    container.innerHTML = `
+        <div id="map-wrapper" style="
+            width: 100%;
+            height: 70vh;
+            min-height: 450px;
+            border-radius: 24px;
+            overflow: hidden;
+            border: 1px solid var(--border);
+            position: relative;
+            background: var(--bg);
+            box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+        ">
+            <div id="map" style="width: 100%; height: 100%; z-index: 1;"></div>
+        </div>
+        <div id="map-stats" style="margin-top: 15px; text-align: center;">
+            <p style="font-size: 12px; color: var(--text-dim); background: var(--card); padding: 8px 20px; border-radius: 30px; border: 1px solid var(--border); backdrop-filter: blur(10px);">
+                📍 Standorte werden geladen...
+            </span>
+        </div>
+    `;
+
+    // 2. Kurze Verzögerung, damit das HTML gerendert wird
+    setTimeout(() => {
+        // Falls schon eine Karte existiert, diese sauber entfernen
+        if (window.myMap) {
+            window.myMap.remove();
+        }
+
+        // 3. Karte initialisieren
+        window.myMap = L.map('map', {
+            zoomControl: false,
+            attributionControl: false
+        }).setView([51.1657, 10.4515], 6);
+
+        const isDark = document.body.getAttribute('data-theme') === 'dark';
+        const tileLayer = isDark 
+            ? 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png'
+            : 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png';
+
+        L.tileLayer(tileLayer).addTo(window.myMap);
+        L.control.zoom({ position: 'bottomright' }).addTo(window.myMap);
+
+        // 4. Marker setzen
+        db.customers.forEach(c => {
+            if (c.address) {
+                fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(c.address)}`)
+                    .then(res => res.json())
+                    .then(data => {
+                        if (data && data.length > 0) {
+                            const marker = L.marker([data[0].lat, data[0].lon]).addTo(window.myMap);
+                            marker.bindPopup(`
+                                <div style="color: #000; font-family: sans-serif; padding: 5px;">
+                                    <b style="font-size:14px">${c.name}</b><br>
+                                    <span style="font-size:12px">${c.address}</span><br>
+                                    <button onclick="openCustProfile(${c.id})" style="width:100%; margin-top:8px; background:#6366f1; color:white; border:none; padding:6px; border-radius:6px; cursor:pointer">Profil</button>
+                                </div>
+                            `);
+                        }
+                    });
+            }
+        });
+
+        // 5. DER WICHTIGSTE SCHRITT: 
+        // Wir "schütteln" die Karte nach 300ms wach, damit sie die volle Größe erkennt
+        setTimeout(() => {
+            window.myMap.invalidateSize(true);
+        }, 300);
+
+    }, 100);
+    }
+
+    // --- DEBT / CASH ---
+    function renderDebt(container) {
+        const debtors = db.customers.map(c => ({
+            id: c.id,
+            name: c.name,
+            debt: getCustomerDebt(c.id)
+        })).filter(x => x.debt > 0.05);
+
+        container.innerHTML = `
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px">
+                <h3 style="margin:0">Offene Posten</h3>
+                <span class="badge badge-low" style="font-size:14px">${debtors.reduce((s,d)=>s+d.debt,0).toFixed(2)}€ Gesamt</span>
+            </div>
+            ${debtors.map(item => `
+                <div class="glass-card animate-item">
+                    <div style="display:flex; justify-content:space-between; align-items:center">
+                        <div>
+                            <div style="font-weight:700">${item.name}</div>
+                            <div style="font-size:20px; font-weight:800; color:var(--danger)">${item.debt.toFixed(2)} €</div>
+                        </div>
+                        <button class="btn-action" style="width:auto; padding:10px 20px" onclick="openPayModal(${item.id}, ${item.debt})">Zahlen</button>
+                    </div>
+                </div>
+            `).join('') || '<div style="text-align:center; padding:50px; color:var(--text-dim)">Alle Schulden sind beglichen! 🥂</div>'}
+        `;
+    }
+
+    function openPayModal(cid, currentDebt) {
+        closeModal();
+        setTimeout(() => {
+            document.getElementById('modal-content').innerHTML = `
+                <h3>Zahlung buchen</h3>
+                <input type="number" id="payVal" value="${currentDebt.toFixed(2)}">
+                <button class="btn-action" style="margin-top:15px" onclick="confirmPayment(${cid})">Bestätigen</button>
+            `;
+            document.getElementById('modal').classList.remove('hidden');
+        }, 100);
+    }
+
+    function confirmPayment(cid) {
+        const amount = parseFloat(document.getElementById('payVal').value);
+        const c = db.customers.find(x => x.id === cid);
+        if(!isNaN(amount)) {
+            db.payments.push({ id: Date.now(), cid, amount, date: Date.now() });
+            addLog(`Zahlung erhalten: ${c.name} (${amount.toFixed(2)} €).`);
+            closeModal(); render();
+        }
+    }
+
+    // --- LOGIC ---
+    function addP() {
+        const n = document.getElementById('pn').value;
+        const p = parseFloat(document.getElementById('pp').value);
+        const c = parseFloat(document.getElementById('pc').value) || 0;
+        const s = parseInt(document.getElementById('ps').value) || 0;
+        const w = document.getElementById('pw').value;
+        if(n && !isNaN(p)) {
+            db.products.push({id: Date.now(), name: n, price: p, cost: c, stock: s, weight: w});
+            addLog(`Neues Produkt erstellt: ${n}.`);
+            render(); toast("Produkt gespeichert");
+        }
+    }
+
+    function addC() {
+        const fname = document.getElementById('cfn').value;
+        const lname = document.getElementById('cln').value;
+        if(fname) { 
+            const newCust = {
+                id: Date.now(),
+                name: fname + (lname ? ' ' + lname : ''),
+                pic: document.getElementById('cpic').value,
+                address: document.getElementById('cadr').value,
+                age: document.getElementById('cage').value,
+                gender: document.getElementById('cgen').value,
+                instagram: document.getElementById('cinsta').value,
+                snapchat: document.getElementById('csnap').value,
+                telegram: document.getElementById('ctele').value,
+                phone: document.getElementById('cphone').value,
+                note: ''
+            };
+            db.customers.push(newCust); 
+            addLog(`Neuer Kunde angelegt: ${newCust.name}.`);
+            render(); toast("Kunde erstellt"); 
+        } else {
+            toast("Vorname ist Pflicht!");
+        }
+    }
+
+    function updateCustNote(cid, text) {
+        const c = db.customers.find(x => x.id === cid);
+        if(c) { 
+            c.note = text; 
+            addLog(`Notiz für Kunde ${c.name} aktualisiert.`);
+            sync(); 
+        }
+    }
+
+    function openSale(cid) {
+        closeModal();
+        setTimeout(() => {
+            document.getElementById('modal-content').innerHTML = `
+                <h3>Verkauf</h3>
+                <select id="selP">${db.products.map(p => `<option value="${p.id}">${p.name} (${p.stock})</option>`).join('')}</select>
+                <input type="number" id="selQ" value="1">
+                <button class="btn-action" style="margin-top:15px" onclick="confirmSale(${cid})">Buchen</button>
+            `;
+            document.getElementById('modal').classList.remove('hidden');
+        }, 100);
+    }
+
+    function confirmSale(cid) {
+        const pid = parseInt(document.getElementById('selP').value);
+        const qty = parseInt(document.getElementById('selQ').value);
+        const prod = db.products.find(p => p.id === pid);
+        const cust = db.customers.find(c => c.id === cid);
+        if(prod && prod.stock >= qty) {
+            prod.stock -= qty;
+            db.sales.push({id: Date.now(), cid, pid, qty, date: Date.now()});
+            addLog(`Verkauf gebucht: ${qty}x ${prod.name} an ${cust.name}.`);
+            closeModal(); render();
+        } else toast("Zu wenig Lagerbestand!");
+    }
+
+    // --- SETTINGS & BACKUP ---
+    function showBackupMenu() {
+        const content = document.getElementById('modal-content');
+        content.innerHTML = `
+            <h3>Einstellungen</h3>
+            <button class="btn-action" style="margin-bottom:10px" onclick="showSecurityLogs()">Sicherheits-Logs</button>
+            <button class="btn-action" style="margin-bottom:10px" onclick="generateMonthlyReport()">Monatsabschluss</button>
+            <button class="btn-action" onclick="downloadData()">Export Backup</button>
+            <button class="btn-outline" style="margin-top:20px; width:100%" onclick="logout()">App Sperren (Logout)</button>
+            <button class="btn-outline" style="margin-top:20px; width:100%; color:var(--danger)" onclick="if(confirm('Alles löschen?')) {localStorage.clear(); location.reload();}">Hard Reset</button>
+        `;
+        document.getElementById('modal').classList.remove('hidden');
+    }
+
+    function generateMonthlyReport() {
+        const now = new Date();
+        const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).getTime();
+        const monthSales = db.sales.filter(s => s.date >= startOfMonth);
+        let revenue = 0; let profit = 0;
+        const prodCounts = {}; const custSpending = {};
+        monthSales.forEach(s => {
+            const p = db.products.find(x => x.id === s.pid);
+            if(p) {
+                const sRev = s.qty * p.price;
+                const sProf = s.qty * (p.price - (p.cost || 0));
+                revenue += sRev; profit += sProf;
+                prodCounts[p.name] = (prodCounts[p.name] || 0) + s.qty;
+                custSpending[s.cid] = (custSpending[s.cid] || 0) + sRev;
+            }
+        });
+        const topProds = Object.entries(prodCounts).sort((a,b) => b[1] - a[1]).slice(0,3);
+        const topCusts = Object.entries(custSpending)
+            .map(([cid, amt]) => ({ name: db.customers.find(c => c.id == cid)?.name || 'Gelöscht', amt }))
+            .sort((a,b) => b.amt - a.amt).slice(0,3);
+        const monthName = now.toLocaleString('de-DE', { month: 'long', year: 'numeric' });
+        let reportText = `Business-Tracker - Monatsabschluss: ${monthName}\n==========================================\n\n`;
+        reportText += `FINANZEN:\n- Gesamtumsatz: ${revenue.toFixed(2)} €\n- Reingewinn: ${profit.toFixed(2)} €\n\n`;
+        reportText += `TOP PRODUKTE:\n` + topProds.map((p, i) => `${i+1}. ${p[0]} (${p[1]} Einheiten)`).join('\n') + `\n\n`;
+        reportText += `TOP KUNDEN:\n` + topCusts.map((c, i) => `${i+1}. ${c.name} (${c.amt.toFixed(2)} € Umsatz)`).join('\n');
+        const blob = new Blob([reportText], {type:'text/plain'});
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = `Monatsabschluss_${monthName.replace(' ','_')}.txt`;
+        a.click();
+        addLog(`Monatsbericht erstellt für ${monthName}.`);
+        toast("Bericht erstellt");
+    }
+
+    function showSecurityLogs() {
+        closeModal();
+        setTimeout(() => {
+            const logs = JSON.parse(localStorage.getItem('nx_v3_logs')) || [];
+            const content = document.getElementById('modal-content');
+            content.innerHTML = `
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px">
+                    <h3 style="margin:0">Sicherheits-Logs</h3>
+                    <i data-lucide="x" onclick="closeModal()" style="cursor:pointer"></i>
+                </div>
+                <div style="max-height: 400px; overflow-y: auto;">
+                    ${logs.map(log => `
+                        <div class="log-entry">
+                            <span class="log-time">${new Date(log.time).toLocaleString('de-DE')}</span>
+                            <span class="log-msg">${log.msg}</span>
+                        </div>
+                    `).join('') || '<p style="color:var(--text-dim)">Keine Logs vorhanden.</p>'}
+                </div>
+            `;
+            document.getElementById('modal').classList.remove('hidden');
+            lucide.createIcons();
+        }, 100);
+    }
+
+    function downloadData() {
+        const blob = new Blob([JSON.stringify(db)], {type:'application/json'});
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = `Business_Tracker_backup_${new Date().toISOString().slice(0,10)}.json`;
+        a.click();
+        addLog("Daten-Backup exportiert.");
+    }
+
+    function del(type, id) {
+        if(confirm("Löschen?")) { 
+            const item = db[type].find(x => x.id === id);
+            addLog(`Eintrag gelöscht: ${item?.name || 'ID ' + id} aus ${type}.`);
+            db[type] = db[type].filter(x => x.id !== id); 
+            render(); 
+        }
+    }
+
+    function handleSearch() {
+        const term = document.getElementById('globalSearch').value.toLowerCase();
+        document.querySelectorAll('.list-item').forEach(c => c.classList.toggle('hidden', !c.innerText.toLowerCase().includes(term)));
+    }
+
+    function closeModal() { document.getElementById('modal').classList.add('hidden'); }
+
+    window.onload = () => {
+        initAuth();
+    };
+
+    // Mache Funktionen global verfügbar für onclick-Handler
+    window.handleLogin = handleLogin;
+    window.logout = logout;
+    window.toggleTheme = toggleTheme;
+    window.nav = nav;
+    window.showBackupMenu = showBackupMenu;
+    window.downloadData = downloadData;
+    window.generateMonthlyReport = generateMonthlyReport;
+    window.showSecurityLogs = showSecurityLogs;
+    window.closeModal = closeModal;
+    window.openCustProfile = openCustProfile;
+    window.openSale = openSale;
+    window.openPayModal = openPayModal;
+    window.openRestockModal = openRestockModal;
+    window.confirmSale = confirmSale;
+    window.confirmPayment = confirmPayment;
+    window.confirmRestock = confirmRestock;
+    window.addP = addP;
+    window.addC = addC;
+    window.del = del;
+    window.changeMonth = changeMonth;
+    window.showDayDetails = showDayDetails;
+</script>
+</body>
+</html>
