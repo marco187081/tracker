@@ -290,6 +290,8 @@
 <div id="debug-panel" style="position: fixed; bottom: 80px; right: 10px; background: rgba(0,0,0,0.9); color: lime; padding: 10px; border-radius: 10px; font-size: 10px; max-width: 300px; max-height: 200px; overflow-y: auto; z-index: 9999; font-family: monospace;">
     <div style="font-weight: bold; margin-bottom: 5px;">🔍 DEBUG LOG:</div>
     <div id="debug-log"></div>
+<!-- FIREBASE TEST BUTTON -->
+<button id="firebase-test-btn" style="position: fixed; top: 10px; right: 10px; z-index: 10000; padding: 10px; background: red; color: white; border: none; border-radius: 5px; font-weight: bold; cursor: pointer;">🔥 FIREBASE TEST</button>
 </div>
 
 <div id="app-content" class="hidden">
@@ -363,13 +365,10 @@
     };
 
     let allowedUsers = [];
-    let db = { products: JSON.parse(localStorage.getItem('nx_v3_products')) || [], customers: JSON.parse(localStorage.getItem('nx_v3_customers')) || [], sales: JSON.parse(localStorage.getItem('nx_v3_sales')) || [], payments: JSON.parse(localStorage.getItem('nx_v3_payments')) || [], restocks: JSON.parse(localStorage.getItem('nx_v3_restocks')) || [] };
+    let db = { products: [], customers: [], sales: [], payments: [], restocks: [] }; // Wird von Firebase geladen
     let calDate = new Date();
     let currentTab = 'dash';
 
-    // CLOUD SYNC: Lade Daten von Firebase
-    const loadFromCloud = () => {
-    // CLOUD SYNC: Lade Daten von Firebase
     const loadFromCloud = () => {
         debugLog("👂 LISTENING auf Firebase Änderungen...");
         onSnapshot(doc(firestore, "businessData", "mainStore"), (docSnap) => {
@@ -378,7 +377,6 @@
                 const cloudData = docSnap.data();
                 debugLog("📦 Cloud Daten:", { products: cloudData.products?.length, customers: cloudData.customers?.length });
                 db = cloudData;
-                Object.keys(db).forEach(key => localStorage.setItem(`nx_v3_${key}`, JSON.stringify(db[key])));
                 if(isAuthenticated) {
                     debugLog("🔄 RENDERING nach Cloud Update...");
                     render();
@@ -404,8 +402,6 @@
             await setDoc(doc(firestore, "businessData", "mainStore"), db);
             debugLog("✅ FIREBASE SYNC ERFOLGREICH!");
             
-            Object.keys(db).forEach(key => localStorage.setItem(`nx_v3_${key}`, JSON.stringify(db[key])));
-            debugLog("✅ LOCALSTORAGE SYNC ERFOLGREICH!");
             
             lucide.createIcons();
         } catch (e) {
@@ -1193,6 +1189,41 @@
     }
 
     function closeModal() { document.getElementById('modal').classList.add('hidden'); }
+
+    // FIREBASE TEST FUNKTION
+    async function testFirebase() {
+        debugLog("🧪 FIREBASE TEST GESTARTET...");
+        document.getElementById("firebase-test-btn").onclick = testFirebase;
+        try {
+            // Test 1: Schreibe Test-Daten
+            const testData = {
+                products: [{id: Date.now(), name: "TEST PRODUKT", price: 99.99, stock: 5}],
+                customers: [],
+                sales: [],
+                payments: [],
+                restocks: []
+            };
+            debugLog("📤 Schreibe Test-Daten...");
+            await setDoc(doc(firestore, "businessData", "mainStore"), testData);
+            debugLog("✅ Test-Daten geschrieben!");
+            
+            // Test 2: Lese Test-Daten
+            debugLog("📥 Lese Test-Daten...");
+            const docSnap = await getDoc(doc(firestore, "businessData", "mainStore"));
+            if (docSnap.exists()) {
+                debugLog("✅ Test-Daten gelesen: " + JSON.stringify(docSnap.data()).substring(0, 100));
+                alert("✅ FIREBASE FUNKTIONIERT! Daten wurden geschrieben und gelesen.");
+            } else {
+                debugLog("❌ Keine Daten gefunden");
+                alert("❌ Fehler: Keine Daten gefunden");
+            }
+        } catch (e) {
+            debugLog("❌ FIREBASE TEST FEHLER: " + e.message);
+            alert("❌ FIREBASE FEHLER: " + e.message);
+        }
+    }
+    
+    window.testFirebase = testFirebase;
 
     window.onload = () => {
         initAuth();
